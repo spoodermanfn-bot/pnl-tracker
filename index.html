@@ -449,11 +449,11 @@
     }
 
     async function fetchTransactions(wallet) {
-      // Use standard Solana RPC with Helius
-      const rpcUrl = 'https://mainnet.helius-rpc.com/?api-key=b0fd0697-bb94-45e3-aa6e-ab90fd78e6d1';
-      
       try {
-        // Get transaction signatures
+        // Use public Solana RPC
+        const rpcUrl = 'https://api.mainnet-beta.solana.com';
+        
+        // Step 1: Get transaction signatures
         const sigResponse = await fetch(rpcUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -461,30 +461,40 @@
             jsonrpc: '2.0',
             id: 1,
             method: 'getSignaturesForAddress',
-            params: [wallet, { limit: 50 }]
+            params: [
+              wallet,
+              { limit: 30 }
+            ]
           })
         });
 
         if (!sigResponse.ok) {
-          throw new Error(`HTTP Error ${sigResponse.status}: ${sigResponse.statusText}. This usually means the API endpoint is down or your IP is rate-limited.`);
+          const statusText = sigResponse.statusText;
+          throw new Error(`Network Error ${sigResponse.status}: Cannot reach Solana RPC. Status: ${statusText}. This usually means: (1) Your internet is down, (2) Solana RPC is overloaded, or (3) CORS blocking the request.`);
         }
 
         const sigData = await sigResponse.json();
         
         if (sigData.error) {
-          throw new Error(`RPC Error: ${sigData.error.message}. Code: ${sigData.error.code}. This usually means the wallet address is invalid or the RPC is rejecting requests.`);
+          throw new Error(`Solana RPC Error: ${sigData.error.message || 'Unknown error'}. Error code: ${sigData.error.code || 'N/A'}. This means: The wallet address might be invalid or has no transactions.`);
         }
 
         if (!sigData.result || sigData.result.length === 0) {
-          throw new Error('No transactions found for this wallet. Make sure the address is correct and has transaction history.');
+          throw new Error(`No transactions found. This wallet either: (1) Has never made a transaction, (2) Address is incorrect, or (3) Is a brand new wallet. Wallet checked: ${wallet.substring(0, 8)}...`);
         }
 
-        const signatures = sigData.result.map(tx => tx.signature).slice(0, 20);
-        const transactions = [];
+        console.log(`Found ${sigData.result.length} transaction signatures`);
 
-        // Fetch each transaction
-        for (const sig of signatures) {
+        // Step 2: Get detailed transaction data
+        const signatures = sigData.result.slice(0, 15).map(tx => tx.signature);
+        const transactions = [];
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const [index, sig] of signatures.entries()) {
           try {
+            console.log(`Fetching transaction ${index + 1}/${signatures.length}`);
+            
             const txResponse = await fetch(rpcUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -504,26 +514,40 @@
 
             if (txResponse.ok) {
               const txData = await txResponse.json();
-              if (txData.result) {
+              if (txData.result && txData.result.meta) {
                 transactions.push(txData.result);
+                successCount++;
+              } else {
+                failCount++;
               }
+            } else {
+              failCount++;
             }
 
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Rate limiting - wait between requests
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
           } catch (err) {
-            console.warn('Skipped transaction:', sig);
+            console.warn(`Failed to fetch transaction ${sig}:`, err.message);
+            failCount++;
           }
         }
 
+        console.log(`Successfully fetched ${successCount} transactions, ${failCount} failed`);
+
         if (transactions.length === 0) {
-          throw new Error('Could not fetch transaction details. The transactions might be too old or the data is not available. Try a wallet with recent activity.');
+          throw new Error(`Could not fetch any transaction details. Reasons: (1) All transactions are too old (>90 days), (2) Rate limit hit - wait 30 seconds and try again, or (3) RPC is temporarily down. Success: ${successCount}, Failed: ${failCount}`);
         }
 
         return transactions;
 
       } catch (error) {
+        // Provide detailed error based on type
         if (error.message.includes('Failed to fetch')) {
-          throw new Error('Network error: Cannot connect to Solana RPC. Check your internet connection or the RPC might be down. Error: CORS or network timeout.');
+          throw new Error(`CORS/Network Error: Your browser blocked the request to Solana RPC. This happens when: (1) You're on HTTP not HTTPS, (2) Browser security settings, or (3) Network firewall. Original error: ${error.message}`);
+        }
+        if (error.message.includes('NetworkError')) {
+          throw new Error(`Network Connection Failed: Cannot connect to Solana blockchain. Check: (1) Your internet connection, (2) Try a different network/WiFi, (3) Disable VPN if active. Error: ${error.message}`);
         }
         throw error;
       }
