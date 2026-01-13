@@ -450,98 +450,86 @@
 
     async function fetchTransactions(wallet) {
       try {
-        // Use CORS proxy for GitHub Pages
-        const corsProxy = 'https://corsproxy.io/?';
-        const rpcUrl = 'https://api.mainnet-beta.solana.com';
-        const proxiedUrl = corsProxy + encodeURIComponent(rpcUrl);
+        console.log('Using Solscan public API...');
         
-        console.log('Fetching with CORS proxy...');
+        // Use Solscan's public API - no CORS issues
+        const solscanUrl = `https://public-api.solscan.io/account/tokens?account=${wallet}`;
         
-        // Get signatures
-        const sigResponse = await fetch(proxiedUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'getSignaturesForAddress',
-            params: [wallet, { limit: 20 }]
-          })
+        const response = await fetch(solscanUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
         });
 
-        if (!sigResponse.ok) {
-          throw new Error(`HTTP ${sigResponse.status}: CORS proxy or RPC failed. The proxy might be down. Try again in 30 seconds.`);
+        if (!response.ok) {
+          throw new Error(`Solscan API Error ${response.status}: ${response.statusText}. The API might be rate-limited. Wait 30 seconds and try again.`);
         }
 
-        const sigData = await sigResponse.json();
+        const data = await response.json();
         
-        if (sigData.error) {
-          throw new Error(`Solana RPC Error: ${sigData.error.message}. This usually means the wallet address is invalid or has no transactions.`);
+        if (!data || (Array.isArray(data) && data.length === 0)) {
+          throw new Error('No token holdings found. This wallet either has no tokens or the address is incorrect.');
         }
 
-        if (!sigData.result || sigData.result.length === 0) {
-          throw new Error('No transactions found for this wallet. The address might be new or incorrect.');
-        }
+        console.log('Solscan data received:', data);
 
-        console.log(`Found ${sigData.result.length} transaction signatures`);
-
-        // Get transaction details
-        const signatures = sigData.result.slice(0, 10).map(tx => tx.signature);
-        const transactions = [];
-
-        for (const [index, sig] of signatures.entries()) {
-          try {
-            console.log(`Fetching transaction ${index + 1}/${signatures.length}`);
+        // Parse token holdings
+        const holdings = Array.isArray(data) ? data : [];
+        
+        // Match with our tracked tokens
+        const matchedTokens = {};
+        
+        holdings.forEach(token => {
+          const tokenMint = token.tokenAddress || token.mint;
+          const tokenEntry = Object.entries(TRACKED_TOKENS).find(
+            ([_, addr]) => addr.toLowerCase() === tokenMint.toLowerCase()
+          );
+          
+          if (tokenEntry) {
+            const [symbol] = tokenEntry;
+            const amount = parseFloat(token.tokenAmount?.uiAmount || token.amount || 0);
             
-            const txResponse = await fetch(proxiedUrl, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: index + 2,
-                method: 'getTransaction',
-                params: [
-                  sig,
-                  { 
-                    encoding: 'jsonParsed',
-                    maxSupportedTransactionVersion: 0
-                  }
-                ]
-              })
-            });
-
-            if (txResponse.ok) {
-              const txData = await txResponse.json();
-              if (txData.result && txData.result.meta) {
-                transactions.push(txData.result);
-                console.log(`✓ Transaction ${index + 1} fetched`);
-              }
-            }
-
-            // Wait between requests
-            await new Promise(resolve => setTimeout(resolve, 500));
+            matchedTokens[symbol] = {
+              symbol,
+              currentHolding: amount,
+              totalBought: amount,
+              totalSold: 0,
+              tradeCount: 1,
+              pnl: 0
+            };
             
-          } catch (err) {
-            console.warn(`Failed transaction ${index + 1}:`, err);
+            console.log(`Found ${symbol}: ${amount}`);
           }
+        });
+
+        if (Object.keys(matchedTokens).length === 0) {
+          throw new Error('No tracked tokens found in this wallet. Make sure you own at least one of: TRUMP, PENGU, BONK, FARTCOIN, WHITEWHALE, PUMP, WIF, USELESS, VINE, or PORTALS.');
         }
 
-        if (transactions.length === 0) {
-          throw new Error('Could not fetch transaction details. Transactions might be too old or the proxy is rate-limited. Wait 1 minute and try again.');
-        }
+        // Create mock transactions for display
+        const mockTransactions = Object.values(matchedTokens).map(token => ({
+          meta: {
+            preTokenBalances: [],
+            postTokenBalances: [{
+              mint: TRACKED_TOKENS[token.symbol],
+              uiTokenAmount: {
+                uiAmount: token.currentHolding
+              },
+              accountIndex: 0
+            }]
+          }
+        }));
 
-        console.log(`✓ Successfully fetched ${transactions.length} transactions`);
-        return transactions;
+        console.log(`✓ Found ${Object.keys(matchedTokens).length} tracked tokens`);
+        
+        return mockTransactions;
 
       } catch (error) {
-        console.error('Fetch error:', error);
+        console.error('API Error:', error);
         
-        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-          throw new Error(`CORS Proxy Failed: Cannot connect through proxy. This means:\n\n1. The corsproxy.io service is down\n2. Your network is blocking the proxy\n3. Rate limit reached\n\nSolution: Wait 1-2 minutes and try again. If it keeps failing, the proxy service might be temporarily down.`);
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error(`Network Error: Cannot reach Solscan API. This could mean:\n\n1. Your internet connection is down\n2. Solscan API is temporarily offline\n3. A firewall is blocking the request\n\nTry again in 30 seconds.`);
         }
         
         throw error;
@@ -563,62 +551,45 @@
       });
 
       let totalBought = 0;
-      let totalSold = 0;
       let totalCurrentValue = 0;
 
+      // Process token holdings
       transactions.forEach(tx => {
-        if (!tx.meta || !tx.meta.preTokenBalances || !tx.meta.postTokenBalances) return;
+        if (!tx.meta || !tx.meta.postTokenBalances) return;
 
-        const preBalances = tx.meta.preTokenBalances;
-        const postBalances = tx.meta.postTokenBalances;
-
-        postBalances.forEach(postBal => {
-          const preBal = preBalances.find(
-            pre => pre.accountIndex === postBal.accountIndex
-          );
-
-          if (!preBal) return;
-
-          const mint = postBal.mint;
+        tx.meta.postTokenBalances.forEach(balance => {
+          const mint = balance.mint;
           const tokenEntry = Object.entries(TRACKED_TOKENS).find(
-            ([_, addr]) => addr === mint
+            ([_, addr]) => addr.toLowerCase() === mint.toLowerCase()
           );
 
           if (!tokenEntry) return;
 
           const [symbol] = tokenEntry;
-          const preAmount = parseFloat(preBal.uiTokenAmount?.uiAmount || 0);
-          const postAmount = parseFloat(postBal.uiTokenAmount?.uiAmount || 0);
-          const diff = postAmount - preAmount;
+          const amount = parseFloat(balance.uiTokenAmount?.uiAmount || 0);
 
-          if (diff > 0) {
-            tokenData[symbol].totalBought += diff;
-            tokenData[symbol].currentHolding += diff;
-            tokenData[symbol].tradeCount++;
-            totalBought += diff * 0.00001;
-          } else if (diff < 0) {
-            tokenData[symbol].totalSold += Math.abs(diff);
-            tokenData[symbol].currentHolding -= Math.abs(diff);
-            tokenData[symbol].tradeCount++;
-            totalSold += Math.abs(diff) * 0.00001;
+          if (amount > 0) {
+            tokenData[symbol].currentHolding = amount;
+            tokenData[symbol].totalBought = amount;
+            tokenData[symbol].tradeCount = 1;
+            
+            // Estimate value (1 token = 0.00001 SOL as placeholder)
+            const estimatedValue = amount * 0.00001;
+            totalBought += estimatedValue;
+            totalCurrentValue += estimatedValue;
           }
         });
       });
 
-      Object.values(tokenData).forEach(token => {
-        if (token.currentHolding > 0) {
-          totalCurrentValue += token.currentHolding * 0.00001;
-        }
-      });
-
-      const totalPNL = (totalSold + totalCurrentValue) - totalBought;
-      const pnlPercent = totalBought > 0 ? (totalPNL / totalBought) * 100 : 0;
+      // Calculate PNL (for current holdings only, no historical trades)
+      const totalPNL = 0; // Can't calculate without historical data
+      const pnlPercent = 0;
 
       return {
         tokens: tokenData,
         summary: {
           totalBought,
-          totalSold,
+          totalSold: 0,
           currentValue: totalCurrentValue,
           totalPNL,
           pnlPercent
