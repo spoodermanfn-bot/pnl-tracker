@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PNL Tracker</title>
+  <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;900&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: linear-gradient(135deg, #000000 0%, #0a0a0a 100%);
+      font-family: 'Space Grotesk', sans-serif;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fullscreen-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .fullscreen-container::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .fullscreen-container::-webkit-scrollbar-track {
+      background: #000;
+    }
+
+    .fullscreen-container::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 5px;
+    }
+
+    .fullscreen-container::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      background: rgba(20,20,20,0.95);
+      border-radius: 20px;
+      border: 2px solid #333;
+      padding: 50px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.9);
+      position: relative;
+    }
+
+    /* Close Button */
+    .close-btn {
+      position: absolute;
+      top: 25px;
+      right: 25px;
+      width: 40px;
+      height: 40px;
+      background: #222;
+      border: 2px solid #444;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      font-size: 24px;
+      color: #999;
+      z-index: 10;
+    }
+
+    .close-btn:hover {
+      background: #fff;
+      color: #000;
+      border-color: #fff;
+      transform: rotate(90deg);
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 25px;
+      border-bottom: 2px solid #333;
+    }
+
+    .title {
+      font-size: 48px;
+      font-weight: 900;
+      color: #FFFFFF;
+      margin-bottom: 10px;
+      letter-spacing: -1px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: rgba(255,255,255,0.6);
+      font-weight: 500;
+    }
+
+    /* Input Section */
+    .input-section {
+      margin-bottom: 30px;
+    }
+
+    .input-label {
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      display: block;
+      font-weight: 600;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .text-input {
+      flex: 1;
+      background: #000;
+      border: 2px solid #333;
+      border-radius: 10px;
+      padding: 18px 22px;
+      color: white;
+      font-size: 16px;
+      font-family: 'Space Grotesk', sans-serif;
+      transition: all 0.3s;
+    }
+
+    .text-input:focus {
+      outline: none;
+      border-color: #666;
+      background: #0a0a0a;
+      box-shadow: 0 0 0 3px rgba(102,102,102,0.1);
+    }
+
+    .text-input::placeholder {
+      color: #444;
+    }
+
+    .wallet-input {
+      font-family: 'Space Grotesk', monospace;
+    }
+
+    .analyze-btn {
+      background: #fff;
+      border: 2px solid #fff;
+      padding: 18px 40px;
+      border-radius: 10px;
+      color: #000;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s;
+      white-space: nowrap;
+    }
+
+    .analyze-btn:hover {
+      background: #000;
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(255,255,255,0.2);
+    }
+
+    .analyze-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Summary Cards */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 35px;
+    }
+
+    .summary-card {
+      background: #111;
+      border: 2px solid #333;
+      border-radius: 15px;
+      padding: 30px;
+      transition: all 0.3s;
+    }
+
+    .summary-card:hover {
+      border-color: #555;
+      transform: translateY(-4px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .card-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .card-value {
+      font-size: 36px;
+      font-weight: 900;
+      color: white;
+      margin-bottom: 8px;
+    }
+
+    .card-value.positive {
+      color: #fff;
+    }
+
+    .card-value.negative {
+      color: #888;
+    }
+
+    .card-value.neutral {
+      color: #aaa;
+    }
+
+    .card-subtitle {
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    /* Token List */
+    .tokens-section {
+      background: #111;
+      border: 2px solid #333;
+      border-radius: 15px;
+      padding: 30px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-bottom: 30px;
+    }
+
+    .tokens-section::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .tokens-section::-webkit-scrollbar-track {
+      background: #000;
+      border-radius: 5px;
+    }
+
+    .tokens-section::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 5px;
+    }
+
+    .tokens-section::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .section-header {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .token-item {
+      background: #0a0a0a;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 15px;
+      transition: all 0.3s;
+    }
+
+    .token-item:hover {
+      border-color: #444;
+      background: #111;
+      transform: translateX(5px);
+    }
+
+    .token-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .token-name {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .token-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #fff;
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 18px;
+    }
+
+    .token-symbol {
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .token-pnl {
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .token-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .stat-item {
+      background: #000;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #1a1a1a;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: white;
+    }
+
+    /* Loading State */
+    .loading {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 5px solid #222;
+      border-top: 5px solid #fff;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 16px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 8px;
+    }
+
+    .loading-detail {
+      font-size: 14px;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* Error State */
+    .error {
+      background: rgba(255,71,87,0.1);
+      border: 2px solid rgba(255,71,87,0.3);
+      border-radius: 12px;
+      padding: 25px;
+      color: #FF4757;
+      font-size: 15px;
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: rgba(255,255,255,0.5);
+      font-size: 16px;
+    }
+
+    .empty-icon {
+      font-size: 60px;
+      margin-bottom: 15px;
+      opacity: 0.3;
+    }
+
+    /* Submit Button */
+    .submit-section {
+      text-align: center;
+    }
+
+    .submit-portals-btn {
+      background: #fff;
+      border: 2px solid #fff;
+      padding: 20px 60px;
+      border-radius: 12px;
+      color: #000;
+      font-weight: 900;
+      font-size: 18px;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 10px 40px rgba(255,255,255,0.2);
+    }
+
+    .submit-portals-btn:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 15px 50px rgba(255,255,255,0.4);
+      background: #000;
+      color: #fff;
+    }
+
+    .submit-portals-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 30px;
+      }
+
+      .title {
+        font-size: 36px;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="fullscreen-container">
+    <div class="container">
+      <div class="close-btn" onclick="closeTracker()">×</div>
+
+      <!-- Header -->
+      <div class="header">
+        <h1 class="title">PNL Tracker</h1>
+        <p class="subtitle">Analyze your Solana memecoin trading performance</p>
+      </div>
+
+      <!-- Input Section -->
+      <div class="input-section">
+        <label class="input-label">Your Username</label>
+        <input 
+          type="text" 
+          class="text-input" 
+          id="usernameInput"
+          placeholder="Enter your display name..."
+          maxlength="20"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="input-section">
+        <label class="input-label">Wallet Address</label>
+        <div class="input-group">
+          <input 
+            type="text" 
+            class="text-input wallet-input" 
+            id="walletInput"
+            placeholder="Paste your Solana wallet address..."
+            autocomplete="off"
+          />
+          <button class="analyze-btn" id="analyzeBtn" onclick="analyzeWallet()">
+            Analyze
+          </button>
+        </div>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="summary-grid" id="summaryGrid" style="display: none;">
+        <div class="summary-card">
+          <div class="card-label">Total Bought</div>
+          <div class="card-value neutral" id="totalBought">0 SOL</div>
+          <div class="card-subtitle">Invested</div>
+        </div>
+        <div class="summary-card">
+          <div class="card-label">Current Value</div>
+          <div class="card-value neutral" id="currentValue">0 SOL</div>
+          <div class="card-subtitle">Holdings</div>
+        </div>
+        <div class="summary-card">
+          <div class="card-label">Total Sold</div>
+          <div class="card-value neutral" id="totalSold">0 SOL</div>
+          <div class="card-subtitle">Realized</div>
+        </div>
+        <div class="summary-card">
+          <div class="card-label">Total PNL</div>
+          <div class="card-value" id="totalPNL">+0 SOL</div>
+          <div class="card-subtitle" id="pnlPercent">+0%</div>
+        </div>
+      </div>
+
+      <!-- Token List -->
+      <div class="tokens-section" id="tokensSection">
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div>Enter your details above to analyze your trades</div>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="submit-section" id="submitSection" style="display: none;">
+        <button class="submit-portals-btn" onclick="submitToPortals()">
+          Submit to Leaderboard
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TRACKED_TOKENS = {
+      'PENGU': '2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv',
+      'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+      'TRUMP': '6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN',
+      'WIF': 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',
+      'POPCAT': '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr',
+      'FARTCOIN': '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump',
+      'MEW': 'MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5',
+      'BOME': 'ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82',
+      'PNUT': '2qEHjDLDLbuBgRYvsxhc5D6uDWAivNFZGan56P1tpump',
+      'AI16Z': 'HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC'
+    };
+
+    let analysisData = null;
+
+    function closeTracker() {
+      PortalsSdk.closeIframe();
+    }
+
+    async function analyzeWallet() {
+      const walletAddress = document.getElementById('walletInput').value.trim();
+      const username = document.getElementById('usernameInput').value.trim();
+      
+      if (!username) {
+        alert('Please enter a username');
+        return;
+      }
+
+      if (!walletAddress) {
+        alert('Please enter a wallet address');
+        return;
+      }
+
+      if (walletAddress.length < 32 || walletAddress.length > 44) {
+        alert('Invalid wallet address format');
+        return;
+      }
+
+      document.getElementById('tokensSection').innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <div class="loading-text">Analyzing wallet...</div>
+          <div class="loading-detail">This may take 10-30 seconds</div>
+        </div>
+      `;
+
+      document.getElementById('analyzeBtn').disabled = true;
+      document.getElementById('analyzeBtn').textContent = 'Analyzing...';
+
+      try {
+        const transactions = await fetchJupiterTransactions(walletAddress);
+        const analysis = processTransactions(transactions, walletAddress);
+        displayResults(analysis);
+        analysisData = analysis;
+
+      } catch (error) {
+        console.error('Analysis error:', error);
+        document.getElementById('tokensSection').innerHTML = `
+          <div class="error">
+            <strong>Error analyzing wallet:</strong> ${error.message}
+            <br><br>
+            Try again or check if the wallet address is correct.
+          </div>
+        `;
+      } finally {
+        document.getElementById('analyzeBtn').disabled = false;
+        document.getElementById('analyzeBtn').textContent = 'Analyze';
+      }
+    }
+
+    async function fetchJupiterTransactions(walletAddress) {
+      const response = await fetch('https://api.mainnet-beta.solana.com', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getSignaturesForAddress',
+          params: [walletAddress, { limit: 100 }]
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+
+      const signatures = data.result.map(tx => tx.signature);
+      const transactions = [];
+
+      for (let i = 0; i < Math.min(signatures.length, 20); i++) {
+        const txResponse = await fetch('https://api.mainnet-beta.solana.com', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getTransaction',
+            params: [signatures[i], { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]
+          })
+        });
+
+        const txData = await txResponse.json();
+        if (txData.result) transactions.push(txData.result);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      return transactions;
+    }
+
+    function processTransactions(transactions, walletAddress) {
+      const tokenData = {};
+      
+      Object.keys(TRACKED_TOKENS).forEach(symbol => {
+        tokenData[symbol] = {
+          symbol: symbol,
+          mint: TRACKED_TOKENS[symbol],
+          totalBought: 0,
+          totalSold: 0,
+          currentHolding: 0,
+          tradeCount: 0,
+          pnl: 0
+        };
+      });
+
+      transactions.forEach(tx => {
+        if (!tx || !tx.meta) return;
+
+        const preBalances = tx.meta.preTokenBalances || [];
+        const postBalances = tx.meta.postTokenBalances || [];
+
+        postBalances.forEach(postBal => {
+          const preBal = preBalances.find(pre => pre.accountIndex === postBal.accountIndex);
+          if (!preBal) return;
+
+          const mint = postBal.mint;
+          const preAmount = parseFloat(preBal.uiTokenAmount?.uiAmount || 0);
+          const postAmount = parseFloat(postBal.uiTokenAmount?.uiAmount || 0);
+          const diff = postAmount - preAmount;
+
+          const tokenEntry = Object.entries(TRACKED_TOKENS).find(([_, address]) => address === mint);
+          if (!tokenEntry) return;
+
+          const [symbol, _] = tokenEntry;
+
+          if (diff > 0) {
+            tokenData[symbol].totalBought += Math.abs(diff);
+            tokenData[symbol].currentHolding += Math.abs(diff);
+            tokenData[symbol].tradeCount++;
+          } else if (diff < 0) {
+            tokenData[symbol].totalSold += Math.abs(diff);
+            tokenData[symbol].currentHolding -= Math.abs(diff);
+            tokenData[symbol].tradeCount++;
+          }
+        });
+      });
+
+      let totalBought = 0;
+      let totalSold = 0;
+      let currentValue = 0;
+      let totalVolume = 0;
+
+      Object.values(tokenData).forEach(token => {
+        if (token.tradeCount > 0) {
+          const estimatedBuyValue = token.totalBought * 0.01;
+          const estimatedSellValue = token.totalSold * 0.01;
+          const estimatedCurrentValue = token.currentHolding * 0.01;
+
+          totalBought += estimatedBuyValue;
+          totalSold += estimatedSellValue;
+          currentValue += estimatedCurrentValue;
+          totalVolume += estimatedBuyValue + estimatedSellValue;
+
+          token.pnl = (estimatedSellValue + estimatedCurrentValue) - estimatedBuyValue;
+        }
+      });
+
+      const totalPNL = (totalSold + currentValue) - totalBought;
+      const pnlPercent = totalBought > 0 ? ((totalPNL / totalBought) * 100) : 0;
+
+      return {
+        tokens: tokenData,
+        summary: {
+          totalBought,
+          totalSold,
+          currentValue,
+          totalPNL,
+          pnlPercent,
+          totalVolume
+        }
+      };
+    }
+
+    function displayResults(analysis) {
+      const { tokens, summary } = analysis;
+
+      document.getElementById('summaryGrid').style.display = 'grid';
+      document.getElementById('totalBought').textContent = summary.totalBought.toFixed(2) + ' SOL';
+      document.getElementById('currentValue').textContent = summary.currentValue.toFixed(2) + ' SOL';
+      document.getElementById('totalSold').textContent = summary.totalSold.toFixed(2) + ' SOL';
+      
+      const pnlEl = document.getElementById('totalPNL');
+      pnlEl.textContent = (summary.totalPNL >= 0 ? '+' : '') + summary.totalPNL.toFixed(2) + ' SOL';
+      pnlEl.className = 'card-value ' + (summary.totalPNL >= 0 ? 'positive' : 'negative');
+      
+      document.getElementById('pnlPercent').textContent = 
+        (summary.pnlPercent >= 0 ? '+' : '') + summary.pnlPercent.toFixed(2) + '%';
+
+      let tokensHtml = '<div class="section-header">Token Breakdown</div>';
+      
+      const tradedTokens = Object.values(tokens).filter(t => t.tradeCount > 0);
+      
+      if (tradedTokens.length === 0) {
+        tokensHtml += `
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <div>No trades found for tracked tokens</div>
+          </div>
+        `;
+      } else {
+        tradedTokens.forEach(token => {
+          const pnlClass = token.pnl >= 0 ? 'positive' : 'negative';
+          tokensHtml += `
+            <div class="token-item">
+              <div class="token-header">
+                <div class="token-name">
+                  <div class="token-icon">${token.symbol[0]}</div>
+                  <div class="token-symbol">${token.symbol}</div>
+                </div>
+                <div class="token-pnl ${pnlClass}">
+                  ${token.pnl >= 0 ? '+' : ''}${token.pnl.toFixed(4)} SOL
+                </div>
+              </div>
+              <div class="token-stats">
+                <div class="stat-item">
+                  <div class="stat-label">Bought</div>
+                  <div class="stat-value">${token.totalBought.toFixed(2)}</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">Sold</div>
+                  <div class="stat-value">${token.totalSold.toFixed(2)}</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">Holding</div>
+                  <div class="stat-value">${token.currentHolding.toFixed(2)}</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">Trades</div>
+                  <div class="stat-value">${token.tradeCount}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+      }
+
+      document.getElementById('tokensSection').innerHTML = tokensHtml;
+      
+      if (tradedTokens.length > 0) {
+        document.getElementById('submitSection').style.display = 'block';
+      }
+    }
+
+    function submitToPortals() {
+      if (!analysisData) {
+        alert('No data to submit');
+        return;
+      }
+
+      const username = document.getElementById('usernameInput').value.trim();
+      if (!username) {
+        alert('Please enter a username');
+        return;
+      }
+
+      const { summary } = analysisData;
+
+      PortalsSdk.sendMessageToUnity(JSON.stringify({
+        action: 'leaderboardUpdate',
+        username: username,
+        pnl: summary.totalPNL.toFixed(2),
+        volume: summary.totalVolume.toFixed(2),
+        wallet: document.getElementById('walletInput').value.trim()
+      }));
+
+      PortalsSdk.sendMessageToUnity(JSON.stringify({
+        TaskName: "pnlSubmitted",
+        TaskTargetState: "SetNotActiveToActive"
+      }));
+
+      alert('PNL submitted to leaderboard! 🎉');
+      
+      setTimeout(() => {
+        closeTracker();
+      }, 1500);
+    }
+
+    PortalsSdk.setMessageListener(function(message) {
+      let data = message;
+      if (typeof message === 'string') {
+        try { 
+          data = JSON.parse(message); 
+        } catch (e) { 
+          data = message;
+        }
+      }
+      
+      if (data.action === 'setWallet' && data.address) {
+        document.getElementById('walletInput').value = data.address;
+      }
+    });
+  </script>
+</body>
+</html>
