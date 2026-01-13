@@ -450,118 +450,100 @@
 
     async function fetchTransactions(wallet) {
       try {
-        // Try multiple RPC endpoints
-        const rpcEndpoints = [
-          'https://api.mainnet-beta.solana.com',
-          'https://solana-api.projectserum.com',
-          'https://rpc.ankr.com/solana'
-        ];
-
-        let lastError = null;
+        // Use CORS proxy for GitHub Pages
+        const corsProxy = 'https://corsproxy.io/?';
+        const rpcUrl = 'https://api.mainnet-beta.solana.com';
+        const proxiedUrl = corsProxy + encodeURIComponent(rpcUrl);
         
-        for (const rpcUrl of rpcEndpoints) {
+        console.log('Fetching with CORS proxy...');
+        
+        // Get signatures
+        const sigResponse = await fetch(proxiedUrl, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getSignaturesForAddress',
+            params: [wallet, { limit: 20 }]
+          })
+        });
+
+        if (!sigResponse.ok) {
+          throw new Error(`HTTP ${sigResponse.status}: CORS proxy or RPC failed. The proxy might be down. Try again in 30 seconds.`);
+        }
+
+        const sigData = await sigResponse.json();
+        
+        if (sigData.error) {
+          throw new Error(`Solana RPC Error: ${sigData.error.message}. This usually means the wallet address is invalid or has no transactions.`);
+        }
+
+        if (!sigData.result || sigData.result.length === 0) {
+          throw new Error('No transactions found for this wallet. The address might be new or incorrect.');
+        }
+
+        console.log(`Found ${sigData.result.length} transaction signatures`);
+
+        // Get transaction details
+        const signatures = sigData.result.slice(0, 10).map(tx => tx.signature);
+        const transactions = [];
+
+        for (const [index, sig] of signatures.entries()) {
           try {
-            console.log(`Trying RPC: ${rpcUrl}`);
+            console.log(`Fetching transaction ${index + 1}/${signatures.length}`);
             
-            // Get signatures
-            const sigResponse = await fetch(rpcUrl, {
+            const txResponse = await fetch(proxiedUrl, {
               method: 'POST',
               headers: { 
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Content-Type': 'application/json'
               },
-              mode: 'cors',
               body: JSON.stringify({
                 jsonrpc: '2.0',
-                id: 'pnl-tracker-1',
-                method: 'getSignaturesForAddress',
-                params: [wallet, { limit: 20 }]
+                id: index + 2,
+                method: 'getTransaction',
+                params: [
+                  sig,
+                  { 
+                    encoding: 'jsonParsed',
+                    maxSupportedTransactionVersion: 0
+                  }
+                ]
               })
             });
 
-            if (!sigResponse.ok) {
-              console.warn(`RPC ${rpcUrl} returned ${sigResponse.status}`);
-              continue;
-            }
-
-            const sigData = await sigResponse.json();
-            
-            if (sigData.error) {
-              console.warn(`RPC error from ${rpcUrl}:`, sigData.error);
-              lastError = new Error(`RPC Error: ${sigData.error.message}`);
-              continue;
-            }
-
-            if (!sigData.result || sigData.result.length === 0) {
-              throw new Error('No transactions found for this wallet. The wallet may be new or have no transaction history.');
-            }
-
-            console.log(`Found ${sigData.result.length} signatures from ${rpcUrl}`);
-
-            // Get transaction details
-            const signatures = sigData.result.slice(0, 10).map(tx => tx.signature);
-            const transactions = [];
-
-            for (const [index, sig] of signatures.entries()) {
-              try {
-                const txResponse = await fetch(rpcUrl, {
-                  method: 'POST',
-                  headers: { 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                  },
-                  mode: 'cors',
-                  body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: `pnl-tracker-tx-${index}`,
-                    method: 'getTransaction',
-                    params: [
-                      sig,
-                      { 
-                        encoding: 'jsonParsed',
-                        maxSupportedTransactionVersion: 0
-                      }
-                    ]
-                  })
-                });
-
-                if (txResponse.ok) {
-                  const txData = await txResponse.json();
-                  if (txData.result && txData.result.meta) {
-                    transactions.push(txData.result);
-                  }
-                }
-
-                await new Promise(resolve => setTimeout(resolve, 300));
-              } catch (err) {
-                console.warn('Transaction fetch failed:', err);
+            if (txResponse.ok) {
+              const txData = await txResponse.json();
+              if (txData.result && txData.result.meta) {
+                transactions.push(txData.result);
+                console.log(`✓ Transaction ${index + 1} fetched`);
               }
             }
 
-            if (transactions.length > 0) {
-              console.log(`Successfully fetched ${transactions.length} transactions`);
-              return transactions;
-            }
-
+            // Wait between requests
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
           } catch (err) {
-            console.warn(`RPC ${rpcUrl} failed:`, err);
-            lastError = err;
-            continue;
+            console.warn(`Failed transaction ${index + 1}:`, err);
           }
         }
 
-        // If we get here, all RPCs failed
-        if (lastError) {
-          if (lastError.message.includes('Failed to fetch') || lastError.message.includes('NetworkError')) {
-            throw new Error(`NETWORK ERROR: Cannot connect to any Solana RPC endpoint. This is a CORS/network issue. Possible fixes:\n\n1. Make sure you're on HTTPS (not HTTP)\n2. Try a different browser (Chrome/Firefox)\n3. Disable browser extensions (AdBlock, etc.)\n4. Check if GitHub Pages URL is correct\n5. Wait 30 seconds and try again (rate limit)\n\nTechnical: All 3 RPC endpoints failed to respond`);
-          }
-          throw lastError;
+        if (transactions.length === 0) {
+          throw new Error('Could not fetch transaction details. Transactions might be too old or the proxy is rate-limited. Wait 1 minute and try again.');
         }
 
-        throw new Error('Could not connect to Solana blockchain. All RPC endpoints are unreachable or rate-limited. Wait 1 minute and try again.');
+        console.log(`✓ Successfully fetched ${transactions.length} transactions`);
+        return transactions;
 
       } catch (error) {
-        console.error('Full error:', error);
+        console.error('Fetch error:', error);
+        
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+          throw new Error(`CORS Proxy Failed: Cannot connect through proxy. This means:\n\n1. The corsproxy.io service is down\n2. Your network is blocking the proxy\n3. Rate limit reached\n\nSolution: Wait 1-2 minutes and try again. If it keeps failing, the proxy service might be temporarily down.`);
+        }
+        
         throw error;
       }
     }
