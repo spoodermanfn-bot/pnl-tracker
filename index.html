@@ -450,105 +450,118 @@
 
     async function fetchTransactions(wallet) {
       try {
-        // Use public Solana RPC
-        const rpcUrl = 'https://api.mainnet-beta.solana.com';
+        // Try multiple RPC endpoints
+        const rpcEndpoints = [
+          'https://api.mainnet-beta.solana.com',
+          'https://solana-api.projectserum.com',
+          'https://rpc.ankr.com/solana'
+        ];
+
+        let lastError = null;
         
-        // Step 1: Get transaction signatures
-        const sigResponse = await fetch(rpcUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'getSignaturesForAddress',
-            params: [
-              wallet,
-              { limit: 30 }
-            ]
-          })
-        });
-
-        if (!sigResponse.ok) {
-          const statusText = sigResponse.statusText;
-          throw new Error(`Network Error ${sigResponse.status}: Cannot reach Solana RPC. Status: ${statusText}. This usually means: (1) Your internet is down, (2) Solana RPC is overloaded, or (3) CORS blocking the request.`);
-        }
-
-        const sigData = await sigResponse.json();
-        
-        if (sigData.error) {
-          throw new Error(`Solana RPC Error: ${sigData.error.message || 'Unknown error'}. Error code: ${sigData.error.code || 'N/A'}. This means: The wallet address might be invalid or has no transactions.`);
-        }
-
-        if (!sigData.result || sigData.result.length === 0) {
-          throw new Error(`No transactions found. This wallet either: (1) Has never made a transaction, (2) Address is incorrect, or (3) Is a brand new wallet. Wallet checked: ${wallet.substring(0, 8)}...`);
-        }
-
-        console.log(`Found ${sigData.result.length} transaction signatures`);
-
-        // Step 2: Get detailed transaction data
-        const signatures = sigData.result.slice(0, 15).map(tx => tx.signature);
-        const transactions = [];
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const [index, sig] of signatures.entries()) {
+        for (const rpcUrl of rpcEndpoints) {
           try {
-            console.log(`Fetching transaction ${index + 1}/${signatures.length}`);
+            console.log(`Trying RPC: ${rpcUrl}`);
             
-            const txResponse = await fetch(rpcUrl, {
+            // Get signatures
+            const sigResponse = await fetch(rpcUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              mode: 'cors',
               body: JSON.stringify({
                 jsonrpc: '2.0',
-                id: 1,
-                method: 'getTransaction',
-                params: [
-                  sig,
-                  {
-                    encoding: 'jsonParsed',
-                    maxSupportedTransactionVersion: 0
-                  }
-                ]
+                id: 'pnl-tracker-1',
+                method: 'getSignaturesForAddress',
+                params: [wallet, { limit: 20 }]
               })
             });
 
-            if (txResponse.ok) {
-              const txData = await txResponse.json();
-              if (txData.result && txData.result.meta) {
-                transactions.push(txData.result);
-                successCount++;
-              } else {
-                failCount++;
-              }
-            } else {
-              failCount++;
+            if (!sigResponse.ok) {
+              console.warn(`RPC ${rpcUrl} returned ${sigResponse.status}`);
+              continue;
             }
 
-            // Rate limiting - wait between requests
-            await new Promise(resolve => setTimeout(resolve, 200));
+            const sigData = await sigResponse.json();
             
+            if (sigData.error) {
+              console.warn(`RPC error from ${rpcUrl}:`, sigData.error);
+              lastError = new Error(`RPC Error: ${sigData.error.message}`);
+              continue;
+            }
+
+            if (!sigData.result || sigData.result.length === 0) {
+              throw new Error('No transactions found for this wallet. The wallet may be new or have no transaction history.');
+            }
+
+            console.log(`Found ${sigData.result.length} signatures from ${rpcUrl}`);
+
+            // Get transaction details
+            const signatures = sigData.result.slice(0, 10).map(tx => tx.signature);
+            const transactions = [];
+
+            for (const [index, sig] of signatures.entries()) {
+              try {
+                const txResponse = await fetch(rpcUrl, {
+                  method: 'POST',
+                  headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  },
+                  mode: 'cors',
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: `pnl-tracker-tx-${index}`,
+                    method: 'getTransaction',
+                    params: [
+                      sig,
+                      { 
+                        encoding: 'jsonParsed',
+                        maxSupportedTransactionVersion: 0
+                      }
+                    ]
+                  })
+                });
+
+                if (txResponse.ok) {
+                  const txData = await txResponse.json();
+                  if (txData.result && txData.result.meta) {
+                    transactions.push(txData.result);
+                  }
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 300));
+              } catch (err) {
+                console.warn('Transaction fetch failed:', err);
+              }
+            }
+
+            if (transactions.length > 0) {
+              console.log(`Successfully fetched ${transactions.length} transactions`);
+              return transactions;
+            }
+
           } catch (err) {
-            console.warn(`Failed to fetch transaction ${sig}:`, err.message);
-            failCount++;
+            console.warn(`RPC ${rpcUrl} failed:`, err);
+            lastError = err;
+            continue;
           }
         }
 
-        console.log(`Successfully fetched ${successCount} transactions, ${failCount} failed`);
-
-        if (transactions.length === 0) {
-          throw new Error(`Could not fetch any transaction details. Reasons: (1) All transactions are too old (>90 days), (2) Rate limit hit - wait 30 seconds and try again, or (3) RPC is temporarily down. Success: ${successCount}, Failed: ${failCount}`);
+        // If we get here, all RPCs failed
+        if (lastError) {
+          if (lastError.message.includes('Failed to fetch') || lastError.message.includes('NetworkError')) {
+            throw new Error(`NETWORK ERROR: Cannot connect to any Solana RPC endpoint. This is a CORS/network issue. Possible fixes:\n\n1. Make sure you're on HTTPS (not HTTP)\n2. Try a different browser (Chrome/Firefox)\n3. Disable browser extensions (AdBlock, etc.)\n4. Check if GitHub Pages URL is correct\n5. Wait 30 seconds and try again (rate limit)\n\nTechnical: All 3 RPC endpoints failed to respond`);
+          }
+          throw lastError;
         }
 
-        return transactions;
+        throw new Error('Could not connect to Solana blockchain. All RPC endpoints are unreachable or rate-limited. Wait 1 minute and try again.');
 
       } catch (error) {
-        // Provide detailed error based on type
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error(`CORS/Network Error: Your browser blocked the request to Solana RPC. This happens when: (1) You're on HTTP not HTTPS, (2) Browser security settings, or (3) Network firewall. Original error: ${error.message}`);
-        }
-        if (error.message.includes('NetworkError')) {
-          throw new Error(`Network Connection Failed: Cannot connect to Solana blockchain. Check: (1) Your internet connection, (2) Try a different network/WiFi, (3) Disable VPN if active. Error: ${error.message}`);
-        }
+        console.error('Full error:', error);
         throw error;
       }
     }
