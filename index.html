@@ -449,16 +449,84 @@
     }
 
     async function fetchTransactions(wallet) {
-      const url = `https://api.helius.xyz/v0/addresses/${wallet}/transactions?api-key=b0fd0697-bb94-45e3-aa6e-ab90fd78e6d1&limit=100`;
+      // Use standard Solana RPC with Helius
+      const rpcUrl = 'https://mainnet.helius-rpc.com/?api-key=b0fd0697-bb94-45e3-aa6e-ab90fd78e6d1';
       
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch transactions. Try again in 1 minute.');
+      try {
+        // Get transaction signatures
+        const sigResponse = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getSignaturesForAddress',
+            params: [wallet, { limit: 50 }]
+          })
+        });
+
+        if (!sigResponse.ok) {
+          throw new Error(`HTTP Error ${sigResponse.status}: ${sigResponse.statusText}. This usually means the API endpoint is down or your IP is rate-limited.`);
+        }
+
+        const sigData = await sigResponse.json();
+        
+        if (sigData.error) {
+          throw new Error(`RPC Error: ${sigData.error.message}. Code: ${sigData.error.code}. This usually means the wallet address is invalid or the RPC is rejecting requests.`);
+        }
+
+        if (!sigData.result || sigData.result.length === 0) {
+          throw new Error('No transactions found for this wallet. Make sure the address is correct and has transaction history.');
+        }
+
+        const signatures = sigData.result.map(tx => tx.signature).slice(0, 20);
+        const transactions = [];
+
+        // Fetch each transaction
+        for (const sig of signatures) {
+          try {
+            const txResponse = await fetch(rpcUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'getTransaction',
+                params: [
+                  sig,
+                  {
+                    encoding: 'jsonParsed',
+                    maxSupportedTransactionVersion: 0
+                  }
+                ]
+              })
+            });
+
+            if (txResponse.ok) {
+              const txData = await txResponse.json();
+              if (txData.result) {
+                transactions.push(txData.result);
+              }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } catch (err) {
+            console.warn('Skipped transaction:', sig);
+          }
+        }
+
+        if (transactions.length === 0) {
+          throw new Error('Could not fetch transaction details. The transactions might be too old or the data is not available. Try a wallet with recent activity.');
+        }
+
+        return transactions;
+
+      } catch (error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Network error: Cannot connect to Solana RPC. Check your internet connection or the RPC might be down. Error: CORS or network timeout.');
+        }
+        throw error;
       }
-      
-      const data = await response.json();
-      return data || [];
     }
 
     function processTransactions(transactions) {
@@ -477,34 +545,54 @@
 
       let totalBought = 0;
       let totalSold = 0;
+      let totalCurrentValue = 0;
 
       transactions.forEach(tx => {
-        if (!tx.tokenTransfers) return;
+        if (!tx.meta || !tx.meta.preTokenBalances || !tx.meta.postTokenBalances) return;
 
-        tx.tokenTransfers.forEach(transfer => {
+        const preBalances = tx.meta.preTokenBalances;
+        const postBalances = tx.meta.postTokenBalances;
+
+        postBalances.forEach(postBal => {
+          const preBal = preBalances.find(
+            pre => pre.accountIndex === postBal.accountIndex
+          );
+
+          if (!preBal) return;
+
+          const mint = postBal.mint;
           const tokenEntry = Object.entries(TRACKED_TOKENS).find(
-            ([_, addr]) => addr === transfer.mint
+            ([_, addr]) => addr === mint
           );
 
           if (!tokenEntry) return;
 
           const [symbol] = tokenEntry;
-          const amount = Math.abs(transfer.tokenAmount || 0);
+          const preAmount = parseFloat(preBal.uiTokenAmount?.uiAmount || 0);
+          const postAmount = parseFloat(postBal.uiTokenAmount?.uiAmount || 0);
+          const diff = postAmount - preAmount;
 
-          if (transfer.fromUserAccount) {
-            tokenData[symbol].totalSold += amount;
+          if (diff > 0) {
+            tokenData[symbol].totalBought += diff;
+            tokenData[symbol].currentHolding += diff;
             tokenData[symbol].tradeCount++;
-            totalSold += amount * 0.000001;
-          } else {
-            tokenData[symbol].totalBought += amount;
-            tokenData[symbol].currentHolding += amount;
+            totalBought += diff * 0.00001;
+          } else if (diff < 0) {
+            tokenData[symbol].totalSold += Math.abs(diff);
+            tokenData[symbol].currentHolding -= Math.abs(diff);
             tokenData[symbol].tradeCount++;
-            totalBought += amount * 0.000001;
+            totalSold += Math.abs(diff) * 0.00001;
           }
         });
       });
 
-      const totalPNL = totalSold - totalBought;
+      Object.values(tokenData).forEach(token => {
+        if (token.currentHolding > 0) {
+          totalCurrentValue += token.currentHolding * 0.00001;
+        }
+      });
+
+      const totalPNL = (totalSold + totalCurrentValue) - totalBought;
       const pnlPercent = totalBought > 0 ? (totalPNL / totalBought) * 100 : 0;
 
       return {
@@ -512,7 +600,7 @@
         summary: {
           totalBought,
           totalSold,
-          currentValue: totalBought * 0.5,
+          currentValue: totalCurrentValue,
           totalPNL,
           pnlPercent
         }
