@@ -1,690 +1,165 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>PNL Tracker</title>
-  <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Map Voting - 4 Maps</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;900&display=swap');
-    
-    * {
+    body {
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
-    }
-    
-    body {
-      background: #000000;
-      font-family: 'Space Grotesk', sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
+      background: transparent;
       color: white;
-      padding: 30px;
-      min-height: 100vh;
-    }
-
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-
-    .header {
-      text-align: center;
-      margin-bottom: 40px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid #333;
-    }
-
-    .title {
-      font-size: 42px;
-      font-weight: 900;
-      color: #FFFFFF;
-      margin-bottom: 8px;
-      letter-spacing: -1px;
-    }
-
-    .subtitle {
-      font-size: 16px;
-      color: #666;
-      font-weight: 500;
-    }
-
-    .wallet-input-section {
-      background: #111;
-      border: 2px solid #222;
-      border-radius: 12px;
-      padding: 30px;
-      margin-bottom: 30px;
-    }
-
-    .input-group {
+      height: 100vh;
       display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .wallet-input {
-      flex: 1;
-      background: #000;
-      border: 2px solid #333;
-      border-radius: 8px;
-      padding: 16px 20px;
-      color: white;
-      font-size: 16px;
-      font-family: 'Space Grotesk', monospace;
-      transition: all 0.3s;
-    }
-
-    .wallet-input:focus {
-      outline: none;
-      border-color: #666;
-      background: #0a0a0a;
-    }
-
-    .wallet-input::placeholder {
-      color: #444;
-    }
-
-    .analyze-btn {
-      background: #fff;
-      border: 2px solid #fff;
-      padding: 16px 40px;
-      border-radius: 8px;
-      color: #000;
-      font-weight: 700;
-      font-size: 16px;
-      cursor: pointer;
-      transition: all 0.3s;
-      white-space: nowrap;
-    }
-
-    .analyze-btn:hover {
-      background: #000;
-      color: #fff;
-    }
-
-    .analyze-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-
-    .summary-card {
-      background: #111;
-      border: 2px solid #222;
-      border-radius: 12px;
-      padding: 24px;
-      transition: all 0.3s;
-    }
-
-    .summary-card:hover {
-      border-color: #444;
-      background: #151515;
-    }
-
-    .card-label {
-      font-size: 13px;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 12px;
-      font-weight: 600;
-    }
-
-    .card-value {
-      font-size: 36px;
-      font-weight: 900;
-      color: white;
-      margin-bottom: 8px;
-    }
-
-    .card-value.positive {
-      color: #fff;
-    }
-
-    .card-value.negative {
-      color: #888;
-    }
-
-    .card-subtitle {
-      font-size: 14px;
-      color: #555;
-    }
-
-    .tokens-section {
-      background: #111;
-      border: 2px solid #222;
-      border-radius: 12px;
-      padding: 30px;
-    }
-
-    .section-header {
-      font-size: 20px;
-      font-weight: 700;
-      margin-bottom: 24px;
-      color: white;
-      padding-bottom: 12px;
-      border-bottom: 1px solid #222;
-    }
-
-    .token-item {
-      background: #0a0a0a;
-      border: 1px solid #222;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 16px;
-      transition: all 0.3s;
-    }
-
-    .token-item:hover {
-      border-color: #444;
-      background: #111;
-    }
-
-    .token-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 16px;
-    }
-
-    .token-name {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .token-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: #fff;
-      color: #000;
-      display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-weight: 900;
-      font-size: 18px;
+      overflow: hidden;
     }
 
-    .token-symbol {
-      font-size: 20px;
-      font-weight: 700;
-      color: white;
-    }
-
-    .token-pnl {
-      font-size: 24px;
-      font-weight: 900;
-    }
-
-    .token-stats {
+    .map-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 16px;
-      margin-top: 12px;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      width: 90%;
+      max-width: 860px;
+      padding: 0 20px;
     }
 
-    .stat-item {
-      background: #000;
-      padding: 12px;
-      border-radius: 6px;
-      border: 1px solid #1a1a1a;
-    }
-
-    .stat-label {
-      font-size: 11px;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 6px;
-    }
-
-    .stat-value {
-      font-size: 16px;
-      font-weight: 700;
-      color: white;
-    }
-
-    .loading {
-      text-align: center;
-      padding: 60px 20px;
-    }
-
-    .spinner {
-      width: 60px;
-      height: 60px;
-      border: 4px solid #222;
-      border-top: 4px solid #fff;
-      border-radius: 50%;
-      margin: 0 auto 20px;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    .loading-text {
-      font-size: 16px;
-      color: #666;
-      margin-bottom: 8px;
-    }
-
-    .loading-detail {
-      font-size: 13px;
-      color: #444;
-    }
-
-    .error {
-      background: #1a0000;
-      border: 2px solid #3a0000;
-      border-radius: 12px;
-      padding: 20px;
-      margin-top: 20px;
-      color: #ff6666;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #555;
-    }
-
-    .empty-icon {
-      font-size: 60px;
-      margin-bottom: 16px;
-      opacity: 0.3;
-    }
-
-    .submit-section {
-      margin-top: 30px;
-      text-align: center;
-    }
-
-    .submit-portals-btn {
-      background: #fff;
-      border: 2px solid #fff;
-      padding: 18px 50px;
-      border-radius: 8px;
-      color: #000;
-      font-weight: 900;
-      font-size: 18px;
+    .map-card {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(20, 20, 40, 0.75);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      transition: all 0.25s ease;
       cursor: pointer;
-      transition: all 0.3s;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+      aspect-ratio: 16 / 9;
+      border: 2px solid transparent;
     }
 
-    .submit-portals-btn:hover {
-      background: #000;
-      color: #fff;
+    .map-card:hover {
+      transform: scale(1.07);
+      box-shadow: 0 16px 40px rgba(0, 255, 255, 0.35);
     }
 
-    .submit-portals-btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
+    .map-card.selected {
+      border: 4px solid #00ffff;
+      box-shadow: 0 0 35px #00ffff80;
+      transform: scale(1.05);
+    }
+
+    .map-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .map-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.92), transparent);
+      padding: 18px 12px 14px;
+      font-size: 1.4rem;
+      font-weight: bold;
+      text-align: center;
+      text-shadow: 0 2px 8px black;
+    }
+
+    .vote-btn {
+      background: #ffff00;           /* bright yellow */
+      color: #000000;                /* black text */
+      border: 5px solid #000000;     /* thicker black border */
+      border-radius: 12px;
+      padding: 16px 70px;
+      font-size: 1.6rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 40px;
+      transition: all 0.2s ease;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);  /* shadow */
+    }
+
+    .vote-btn:hover {
+      background: #ffff66;           /* lighter yellow */
+      transform: translateY(-3px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .vote-btn:active {
+      transform: translateY(1px);
+      background: #e6e600;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    @media (max-width: 700px) {
+      .map-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      .vote-btn {
+        padding: 14px 50px;
+        font-size: 1.4rem;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1 class="title">PNL Tracker</h1>
-      <p class="subtitle">Analyze your Solana memecoin trading performance</p>
+
+  <div class="map-grid">
+    <div class="map-card" data-map="warehouse">
+      <img src="https://media.discordapp.net/attachments/1473073478872727785/1473541305178128416/content.png?ex=699695c8&is=69954448&hm=d88453e978cc1ea9cd2a75dfdd346603fc3e644a16bafa56c57fb289e6c49cf7&=&format=webp&quality=lossless" alt="Warehouse">
+      <div class="map-label">Warehouse</div>
     </div>
 
-    <div class="wallet-input-section">
-      <div class="input-group">
-        <input 
-          type="text" 
-          class="wallet-input" 
-          id="walletInput"
-          placeholder="Paste your Solana wallet address"
-          autocomplete="off"
-        />
-        <button class="analyze-btn" id="analyzeBtn" onclick="analyzeWallet()">
-          Analyze Wallet
-        </button>
-      </div>
+    <div class="map-card" data-map="park">
+      <img src="https://media.discordapp.net/attachments/1473073478872727785/1473541305727586344/content.png?ex=699695c8&is=69954448&hm=06c728221955ebef77456b103bc041ba934399d247c832e7f34cd7e23a6d9b75&=&format=webp&quality=lossless" alt="Park">
+      <div class="map-label">Park</div>
     </div>
 
-    <div class="summary-grid" id="summaryGrid" style="display: none;">
-      <div class="summary-card">
-        <div class="card-label">Total Bought</div>
-        <div class="card-value" id="totalBought">0 SOL</div>
-        <div class="card-subtitle">Amount invested</div>
-      </div>
-      <div class="summary-card">
-        <div class="card-label">Current Value</div>
-        <div class="card-value" id="currentValue">0 SOL</div>
-        <div class="card-subtitle">Holdings worth</div>
-      </div>
-      <div class="summary-card">
-        <div class="card-label">Total Sold</div>
-        <div class="card-value" id="totalSold">0 SOL</div>
-        <div class="card-subtitle">Amount realized</div>
-      </div>
-      <div class="summary-card">
-        <div class="card-label">Total PNL</div>
-        <div class="card-value" id="totalPNL">+0 SOL</div>
-        <div class="card-subtitle" id="pnlPercent">+0%</div>
-      </div>
+    <div class="map-card" data-map="pirate">
+      <img src="https://media.discordapp.net/attachments/1473073478872727785/1473541306314784819/content.png?ex=699695c8&is=69954448&hm=e4874e0022a1d6785ec22a2be4fc5138e200d4cf1cf02f5886ae24846f9248fb&=&format=webp&quality=lossless" alt="Pirate">
+      <div class="map-label">Pirate</div>
     </div>
 
-    <div class="tokens-section" id="tokensSection">
-      <div class="empty-state">
-        <div class="empty-icon">📊</div>
-        <div>Enter your wallet address above to analyze your trades</div>
-      </div>
-    </div>
-
-    <div class="submit-section" id="submitSection" style="display: none;">
-      <button class="submit-portals-btn" onclick="submitToPortals()">
-        Submit to Leaderboard
-      </button>
+    <div class="map-card" data-map="castle">
+      <img src="https://media.discordapp.net/attachments/1473073478872727785/1473541306813911170/content.png?ex=699695c8&is=69954448&hm=585363fd64c9cd36b547fe1a2a8cdfaaca9f5267fbd1d0e4b831749246af28a0&=&format=webp&quality=lossless" alt="Castle">
+      <div class="map-label">Castle</div>
     </div>
   </div>
 
+  <button class="vote-btn">Vote</button>
+
   <script>
-    const TRACKED_TOKENS = {
-      'TRUMP': '6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN',
-      'PENGU': '2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv',
-      'BONK': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
-      'FARTCOIN': '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump',
-      'WHITEWHALE': 'a3W4qutoEJA4232T2gwZUfgYJTetr96pU4SJMwppump',
-      'PUMP': 'pumpCmXqMfrsAkQ5r49WcJnRayYRqmXz6ae8H7H9Dfn',
-      'WIF': 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm',
-      'USELESS': 'Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk',
-      'VINE': '6AJcP7wuLwmRYLBNbi825wgguaPsWzPBEHcHndpRpump',
-      'PORTALS': 'PRTLSwfLzpVGSAQiUfXEenJkq1cwTsEcsn1hPL9zwwg'
-    };
+    const cards = document.querySelectorAll('.map-card');
+    const voteBtn = document.querySelector('.vote-btn');
 
-    let analysisData = null;
+    let selectedMap = null;
 
-    async function analyzeWallet() {
-      const walletAddress = document.getElementById('walletInput').value.trim();
-      
-      if (!walletAddress || walletAddress.length < 32) {
-        alert('Please enter a valid Solana wallet address');
-        return;
-      }
-
-      document.getElementById('tokensSection').innerHTML = `
-        <div class="loading">
-          <div class="spinner"></div>
-          <div class="loading-text">Analyzing your wallet...</div>
-          <div class="loading-detail">This may take 15-30 seconds</div>
-        </div>
-      `;
-
-      document.getElementById('analyzeBtn').disabled = true;
-      document.getElementById('analyzeBtn').textContent = 'Analyzing...';
-
-      try {
-        const transactions = await fetchTransactions(walletAddress);
-        const analysis = processTransactions(transactions);
-        displayResults(analysis);
-        analysisData = analysis;
-      } catch (error) {
-        console.error('Error:', error);
-        document.getElementById('tokensSection').innerHTML = `
-          <div class="error">
-            <strong>Error:</strong> ${error.message}
-            <br><br>
-            This usually means:
-            <br>• The wallet has no transaction history
-            <br>• The wallet address is invalid
-            <br>• Rate limits have been hit (try again in 1 minute)
-          </div>
-        `;
-      } finally {
-        document.getElementById('analyzeBtn').disabled = false;
-        document.getElementById('analyzeBtn').textContent = 'Analyze Wallet';
-      }
-    }
-
-    async function fetchTransactions(wallet) {
-      try {
-        console.log('Using Solscan public API...');
-        
-        // Use Solscan's public API - no CORS issues
-        const solscanUrl = `https://public-api.solscan.io/account/tokens?account=${wallet}`;
-        
-        const response = await fetch(solscanUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Solscan API Error ${response.status}: ${response.statusText}. The API might be rate-limited. Wait 30 seconds and try again.`);
-        }
-
-        const data = await response.json();
-        
-        if (!data || (Array.isArray(data) && data.length === 0)) {
-          throw new Error('No token holdings found. This wallet either has no tokens or the address is incorrect.');
-        }
-
-        console.log('Solscan data received:', data);
-
-        // Parse token holdings
-        const holdings = Array.isArray(data) ? data : [];
-        
-        // Match with our tracked tokens
-        const matchedTokens = {};
-        
-        holdings.forEach(token => {
-          const tokenMint = token.tokenAddress || token.mint;
-          const tokenEntry = Object.entries(TRACKED_TOKENS).find(
-            ([_, addr]) => addr.toLowerCase() === tokenMint.toLowerCase()
-          );
-          
-          if (tokenEntry) {
-            const [symbol] = tokenEntry;
-            const amount = parseFloat(token.tokenAmount?.uiAmount || token.amount || 0);
-            
-            matchedTokens[symbol] = {
-              symbol,
-              currentHolding: amount,
-              totalBought: amount,
-              totalSold: 0,
-              tradeCount: 1,
-              pnl: 0
-            };
-            
-            console.log(`Found ${symbol}: ${amount}`);
-          }
-        });
-
-        if (Object.keys(matchedTokens).length === 0) {
-          throw new Error('No tracked tokens found in this wallet. Make sure you own at least one of: TRUMP, PENGU, BONK, FARTCOIN, WHITEWHALE, PUMP, WIF, USELESS, VINE, or PORTALS.');
-        }
-
-        // Create mock transactions for display
-        const mockTransactions = Object.values(matchedTokens).map(token => ({
-          meta: {
-            preTokenBalances: [],
-            postTokenBalances: [{
-              mint: TRACKED_TOKENS[token.symbol],
-              uiTokenAmount: {
-                uiAmount: token.currentHolding
-              },
-              accountIndex: 0
-            }]
-          }
-        }));
-
-        console.log(`✓ Found ${Object.keys(matchedTokens).length} tracked tokens`);
-        
-        return mockTransactions;
-
-      } catch (error) {
-        console.error('API Error:', error);
-        
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error(`Network Error: Cannot reach Solscan API. This could mean:\n\n1. Your internet connection is down\n2. Solscan API is temporarily offline\n3. A firewall is blocking the request\n\nTry again in 30 seconds.`);
-        }
-        
-        throw error;
-      }
-    }
-
-    function processTransactions(transactions) {
-      const tokenData = {};
-      
-      Object.keys(TRACKED_TOKENS).forEach(symbol => {
-        tokenData[symbol] = {
-          symbol,
-          totalBought: 0,
-          totalSold: 0,
-          currentHolding: 0,
-          tradeCount: 0,
-          pnl: 0
-        };
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        cards.forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedMap = card.dataset.map;
+        console.log(`Selected map: ${selectedMap}`);
       });
+    });
 
-      let totalBought = 0;
-      let totalCurrentValue = 0;
-
-      // Process token holdings
-      transactions.forEach(tx => {
-        if (!tx.meta || !tx.meta.postTokenBalances) return;
-
-        tx.meta.postTokenBalances.forEach(balance => {
-          const mint = balance.mint;
-          const tokenEntry = Object.entries(TRACKED_TOKENS).find(
-            ([_, addr]) => addr.toLowerCase() === mint.toLowerCase()
-          );
-
-          if (!tokenEntry) return;
-
-          const [symbol] = tokenEntry;
-          const amount = parseFloat(balance.uiTokenAmount?.uiAmount || 0);
-
-          if (amount > 0) {
-            tokenData[symbol].currentHolding = amount;
-            tokenData[symbol].totalBought = amount;
-            tokenData[symbol].tradeCount = 1;
-            
-            // Estimate value (1 token = 0.00001 SOL as placeholder)
-            const estimatedValue = amount * 0.00001;
-            totalBought += estimatedValue;
-            totalCurrentValue += estimatedValue;
-          }
-        });
-      });
-
-      // Calculate PNL (for current holdings only, no historical trades)
-      const totalPNL = 0; // Can't calculate without historical data
-      const pnlPercent = 0;
-
-      return {
-        tokens: tokenData,
-        summary: {
-          totalBought,
-          totalSold: 0,
-          currentValue: totalCurrentValue,
-          totalPNL,
-          pnlPercent
-        }
-      };
-    }
-
-    function displayResults(analysis) {
-      const { tokens, summary } = analysis;
-
-      document.getElementById('summaryGrid').style.display = 'grid';
-      document.getElementById('totalBought').textContent = summary.totalBought.toFixed(4) + ' SOL';
-      document.getElementById('currentValue').textContent = summary.currentValue.toFixed(4) + ' SOL';
-      document.getElementById('totalSold').textContent = summary.totalSold.toFixed(4) + ' SOL';
-      
-      const pnlEl = document.getElementById('totalPNL');
-      pnlEl.textContent = (summary.totalPNL >= 0 ? '+' : '') + summary.totalPNL.toFixed(4) + ' SOL';
-      pnlEl.className = 'card-value ' + (summary.totalPNL >= 0 ? 'positive' : 'negative');
-      
-      document.getElementById('pnlPercent').textContent = 
-        (summary.pnlPercent >= 0 ? '+' : '') + summary.pnlPercent.toFixed(2) + '%';
-
-      let tokensHtml = '<div class="section-header">Token Breakdown</div>';
-      
-      const tradedTokens = Object.values(tokens).filter(t => t.tradeCount > 0);
-      
-      if (tradedTokens.length === 0) {
-        tokensHtml += `
-          <div class="empty-state">
-            <div class="empty-icon">🔍</div>
-            <div>No trades found for tracked tokens</div>
-          </div>
-        `;
+    voteBtn.addEventListener('click', () => {
+      if (selectedMap) {
+        console.log(`Voted for: ${selectedMap}`);
+        // Replace with real vote submission (e.g. fetch to your server)
+        alert(`You voted for ${selectedMap}!`);
       } else {
-        tradedTokens.forEach(token => {
-          const pnlClass = token.pnl >= 0 ? 'positive' : 'negative';
-          tokensHtml += `
-            <div class="token-item">
-              <div class="token-header">
-                <div class="token-name">
-                  <div class="token-icon">${token.symbol[0]}</div>
-                  <div class="token-symbol">${token.symbol}</div>
-                </div>
-                <div class="token-pnl ${pnlClass}">
-                  ${token.pnl >= 0 ? '+' : ''}${token.pnl.toFixed(6)} SOL
-                </div>
-              </div>
-              <div class="token-stats">
-                <div class="stat-item">
-                  <div class="stat-label">Bought</div>
-                  <div class="stat-value">${token.totalBought.toFixed(2)}</div>
-                </div>
-                <div class="stat-item">
-                  <div class="stat-label">Sold</div>
-                  <div class="stat-value">${token.totalSold.toFixed(2)}</div>
-                </div>
-                <div class="stat-item">
-                  <div class="stat-label">Holding</div>
-                  <div class="stat-value">${token.currentHolding.toFixed(2)}</div>
-                </div>
-                <div class="stat-item">
-                  <div class="stat-label">Trades</div>
-                  <div class="stat-value">${token.tradeCount}</div>
-                </div>
-              </div>
-            </div>
-          `;
-        });
+        alert("Please select a map first!");
       }
-
-      document.getElementById('tokensSection').innerHTML = tokensHtml;
-      
-      if (tradedTokens.length > 0) {
-        document.getElementById('submitSection').style.display = 'block';
-      }
-    }
-
-    function submitToPortals() {
-      if (!analysisData) return;
-
-      const { summary } = analysisData;
-
-      PortalsSdk.sendMessageToUnity(JSON.stringify({
-        TaskName: "pnlSubmitted",
-        TaskTargetState: "SetNotActiveToActive"
-      }));
-
-      PortalsSdk.sendMessageToUnity(JSON.stringify({
-        action: "updatePNL",
-        totalPNL: summary.totalPNL,
-        pnlPercent: summary.pnlPercent
-      }));
-
-      alert('PNL submitted to leaderboard! 🎉');
-    }
+    });
   </script>
+
 </body>
 </html>
